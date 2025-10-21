@@ -53,11 +53,15 @@ class AgentService:
             CartItem("Hotpot Set", "RedMart", 1, 28.40),
             CartItem("Laksa Paste", "FairPrice", 2, 3.10),
         ]
-        allowed_merchants = {m.lower() for m in mandate.merchants_allowed}
+        allowed_tokens: set[str] = set()
+        for merchant in mandate.merchants_allowed:
+            token = self._merchant_token(merchant)
+            if token:
+                allowed_tokens.add(token)
         filtered_cart = [
             item
             for item in base_cart
-            if any(merchant in item.merchant.lower() for merchant in allowed_merchants)
+            if self._merchant_token(item.merchant) in allowed_tokens
         ]
         return filtered_cart
 
@@ -88,6 +92,15 @@ class AgentService:
     def _sign_payload(self, payload: Dict[str, object]) -> str:
         payload_json = json.dumps({k: v for k, v in payload.items() if k != "agent_signature"}, sort_keys=True)
         return hashlib.sha256(payload_json.encode()).hexdigest()
+
+    @staticmethod
+    def _merchant_token(merchant: str) -> str:
+        """Normalize a merchant identifier to its core brand token."""
+        cleaned = merchant.strip().lower()
+        if cleaned.startswith("*."):
+            cleaned = cleaned[2:]
+        cleaned = cleaned.lstrip(".")
+        return cleaned.split(".", 1)[0] if cleaned else ""
 
 
 class MerchantVerifier:
